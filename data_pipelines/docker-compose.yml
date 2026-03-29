@@ -1,4 +1,21 @@
+volumes:
+  postgres-db-volume:
+  delta-warehouse:
+
 services:
+
+  postgres:
+    image: postgres:15
+    container_name: airflow-postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
   spark-master:
     image: spark:latest
     container_name: spark-master
@@ -10,6 +27,8 @@ services:
     ports:
       - "7077:7077"
       - "8080:8080"
+    volumes:
+      - delta-warehouse:/opt/spark/warehouse
 
   spark-worker:
     image: spark:latest
@@ -22,18 +41,37 @@ services:
       - SPARK_NO_DAEMONIZE=true
     depends_on:
       - spark-master
+    volumes:
+      - delta-warehouse:/opt/spark/warehouse
 
-  airflow:
+  airflow-webserver:
     build: .
-    container_name: airflow
+    container_name: airflow-webserver
     restart: always
     depends_on:
+      - postgres
       - spark-master
     environment:
-      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
     volumes:
       - ./dags:/opt/airflow/dags
       - ./spark_jobs:/opt/airflow/spark_jobs
     ports:
       - "8081:8080"
-    command: standalone
+    command: api-server
+
+  airflow-scheduler:
+    build: .
+    container_name: airflow-scheduler
+    restart: always
+    depends_on:
+      - airflow-webserver
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./spark_jobs:/opt/airflow/spark_jobs
+    command: scheduler
