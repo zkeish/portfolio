@@ -14,5 +14,3 @@ with DAG(
         task_id="run_spark_example",
         bash_command="echo 'Spark container is available at spark:4040'",
     )
-
-    run_spark
