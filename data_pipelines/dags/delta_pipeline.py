@@ -6,8 +6,7 @@ from datetime import datetime, timedelta
 default_args = {
     "owner": "airflow",
     "depends_on_past": False,
-    "retries": 1,
-    "retry_delay": timedelta(minutes=5),
+    "retries": 0
 }
 
 # DAG using decorator
@@ -24,10 +23,8 @@ def spark_delta_pipeline():
     # Task: Submit Spark Job
     spark_submit_task = SparkSubmitOperator(
         task_id="run_delta_job",
-        application="./delta_job.py",
-        conn_id="spark_default",
-        spark_binary="/opt/spark/bin/spark-submit",
-        verbose=True,
+        application="./spark_jobs/delta_job.py",
+        conn_id="spark_default"
     )
 
     return spark_submit_task

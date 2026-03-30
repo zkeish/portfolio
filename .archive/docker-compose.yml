@@ -1,0 +1,124 @@
+volumes:
+  postgres-db-volume:
+  delta-warehouse:
+
+services:
+
+  postgres:
+    image: postgres:15
+    container_name: airflow-postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - airflow
+
+  spark-master:
+    image: spark:latest
+    container_name: spark-master
+    command: >
+      /opt/spark/bin/spark-class
+      org.apache.spark.deploy.master.Master
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+    ports:
+      - "7077:7077"
+      - "8080:8080"
+    volumes:
+      - delta-warehouse:/opt/spark/warehouse
+    networks:
+      - airflow
+
+  spark-worker:
+    image: spark:latest
+    container_name: spark-worker
+    command: >
+      /opt/spark/bin/spark-class
+      org.apache.spark.deploy.worker.Worker
+      spark://spark-master:7077
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+    depends_on:
+      - spark-master
+    volumes:
+      - delta-warehouse:/opt/spark/warehouse
+    networks:
+      - airflow
+
+  airflow-api-server:
+    build: .
+    container_name: airflow-api-server
+    restart: always
+    depends_on:
+      - postgres
+      - spark-master
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__WEBSERVER__BASE_URL: http://localhost:8080
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./spark_jobs:/opt/airflow/spark_jobs
+    ports:
+      - "8081:8080"
+    command: api-server
+    networks:
+      - airflow
+
+  airflow-dag-processor:
+    build: .
+    container_name: airflow-dag-processor
+    restart: always
+    depends_on:
+      - airflow-api-server
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__WEBSERVER__BASE_URL: http://localhost:8080
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./spark_jobs:/opt/airflow/spark_jobs
+    command: dag-processor
+    networks:
+      - airflow
+
+  airflow-worker:
+    build: .
+    container_name: airflow-worker
+    restart: always
+    depends_on:
+      - airflow-api-server
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./spark_jobs:/opt/airflow/spark_jobs
+    command: airflow-worker
+    networks:
+      - airflow
+
+  airflow-scheduler:
+    build: .
+    container_name: airflow-scheduler
+    restart: always
+    depends_on:
+      - airflow-api-server
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__WEBSERVER__BASE_URL: http://localhost:8080
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./spark_jobs:/opt/airflow/spark_jobs
+    command: scheduler
+    networks:
+      - airflow
+
+networks:
+  airflow:
