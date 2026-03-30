@@ -6,5 +6,5 @@ USER airflow
 
 RUN pip install \
     apache-airflow-providers-apache-spark \
-    pyspark \
+    pyspark==4.0.2 \
     delta-spark
