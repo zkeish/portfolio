@@ -1,4 +1,4 @@
-FROM apache/airflow:3.1.8-python3.12
+FROM apache/airflow:3.1.8-python3.10
 
 USER root
 RUN apt-get update && apt-get install -y default-jdk && apt-get clean
