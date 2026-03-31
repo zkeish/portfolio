@@ -6,5 +6,7 @@ USER airflow
 
 RUN pip install \
     apache-airflow-providers-apache-spark \
-    pyspark==4.0.2 \
-    delta-spark
+    pyspark==4.1.0 \
+    delta-spark==4.1.0
+
+RUN pip install -i https://test.pypi.org/simple/ auto-cdc --no-deps

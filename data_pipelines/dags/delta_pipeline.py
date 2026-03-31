@@ -24,7 +24,12 @@ def spark_delta_pipeline():
     spark_submit_task = SparkSubmitOperator(
         task_id="run_delta_job",
         application="./spark_jobs/delta_job.py",
-        conn_id="spark_default"
+        conn_id="spark_default",
+        packages="io.delta:delta-spark_2.13:4.1.0",
+        conf={
+            "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
+            "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+        }
     )
 
     return spark_submit_task

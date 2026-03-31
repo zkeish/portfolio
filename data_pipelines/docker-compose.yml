@@ -31,6 +31,7 @@ x-airflow-common:
     - ./config:/opt/airflow/config
     - ./plugins:/opt/airflow/plugins
     - ./spark_jobs:/opt/airflow/spark_jobs
+    - delta-warehouse:/opt/spark/warehouse
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
@@ -74,7 +75,7 @@ services:
       - spark-network
 
   spark-master:
-    image: apache/spark:4.0.2-python3
+    image: apache/spark:4.1.0-python3
     container_name: spark-master
     command: >
       /opt/spark/bin/spark-class
@@ -86,6 +87,8 @@ services:
       - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
       - SPARK_SSL_ENABLED=no
       - SPARK_USER=spark
+    depends_on:
+      - airflow-init
     ports:
       - "7077:7077"
       - "8081:8080"
@@ -95,7 +98,7 @@ services:
       - spark-network
 
   spark-worker:
-    image: apache/spark:4.0.2-python3
+    image: apache/spark:4.1.0-python3
     container_name: spark-worker
     command: >
       /opt/spark/bin/spark-class
@@ -269,6 +272,7 @@ services:
         echo "Creating missing opt dirs if missing:"
         echo
         mkdir -v -p /opt/airflow/{logs,dags,plugins,config}
+        mkdir -v -p /opt/spark/warehouse
         echo
         echo "Airflow version:"
         /entrypoint airflow version
@@ -288,10 +292,14 @@ services:
         echo "Change ownership of files in /opt/airflow to ${AIRFLOW_UID}:0"
         echo
         chown -R "${AIRFLOW_UID}:0" /opt/airflow/
+        chown -R "${AIRFLOW_UID}:0" /opt/spark/
         echo
         echo "Change ownership of files in shared volumes to ${AIRFLOW_UID}:0"
         echo
         chown -v -R "${AIRFLOW_UID}:0" /opt/airflow/{logs,dags,plugins,config}
+        chown -v -R "${AIRFLOW_UID}:0" /opt/spark/warehouse
+        chown -R airflow:airflow /opt/spark/warehouse
+        chmod -R a+rw /opt/spark/warehouse
         echo
         echo "Files in shared volumes:"
         echo
